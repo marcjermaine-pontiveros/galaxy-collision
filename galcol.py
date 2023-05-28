@@ -276,6 +276,10 @@ def evolve_two_disks(primary, secondary, time_step=0.1*unit.Myr, N_steps=1000, N
     snapshots[0] = [np.append([X1,X2], x), np.append([Y1,Y2], y), np.append([Z1,Z2], z)]
     #print(snapshots.shape)
 
+    velocity_snapshots = np.zeros(shape=(N_snapshots+1,3,N1+N2+2))
+    velocity_snapshots[0] = [np.append([V1_x,V2_x], v_x), np.append([V1_y,V2_y], v_y), np.append([V1_z,V2_z], v_z)]
+
+
     # number of steps per snapshot
     div = max(int(N_steps/N_snapshots), 1)
 
@@ -324,6 +328,7 @@ def evolve_two_disks(primary, secondary, time_step=0.1*unit.Myr, N_steps=1000, N
         if n % div == 0:
             i = int(n/div)
             snapshots[i] = [np.append([X1,X2], x), np.append([Y1,Y2], y), np.append([Z1,Z2], z)]
+            velocity_snapshots[i] = [np.append([V1_x,V2_x], v_x), np.append([V1_y,V2_y], v_y), np.append([V1_z,V2_z], v_z)]
 
         # fraction of computation done
         print("\r{:3d} %".format(int(100*n/N_steps)), end="")
@@ -332,8 +337,50 @@ def evolve_two_disks(primary, secondary, time_step=0.1*unit.Myr, N_steps=1000, N
     print(" (stopped at t = {:.1f})".format(time[-1]))
 
     snapshots *= unit.m
+    velocity_snapshots *= unit.m / unit.s
 
-    return time, snapshots.to(unit.kpc)
+    return time, snapshots.to(unit.kpc), velocity_snapshots.to(unit.kpc/unit.s)
+
+def plot_energy(times, snapshots, velocity_snapshots, primary, secondary, indices):
+    # Constants
+    G_mks = G.to(unit.m**3 / (unit.kg * unit.s**2)).value  # gravitational constant
+
+    # Masses of galaxies
+    M1 = primary['mass'].to(unit.kg).value
+    M2 = secondary['mass'].to(unit.kg).value
+
+
+    # For each index, compute specific orbital energy and plot it
+    for i in indices:
+        # Convert to SI units
+        x = snapshots[:,0,i+2].to(unit.m).value
+        y = snapshots[:,1,i+2].to(unit.m).value
+        z = snapshots[:,2,i+2].to(unit.m).value
+        v_x = velocity_snapshots[:,0,i+2].to(unit.m / unit.s).value
+        v_y = velocity_snapshots[:,1,i+2].to(unit.m / unit.s).value
+        v_z = velocity_snapshots[:,2,i+2].to(unit.m / unit.s).value
+
+        v = np.sqrt(v_x**2 + v_y**2 + v_z**2)
+
+        X1, Y1, Z1 = snapshots[:,0,0].to(unit.m).value, snapshots[:,1,0].to(unit.m).value, snapshots[:,2,0].to(unit.m).value
+        X2, Y2, Z2 = snapshots[:,0,1].to(unit.m).value, snapshots[:,1,1].to(unit.m).value, snapshots[:,2,1].to(unit.m).value
+        r1 = np.sqrt((X1 - x)**2 + (Y1 - y)**2 + (Z1 - z)**2)
+        r2 = np.sqrt((X2 - x)**2 + (Y2 - y)**2 + (Z2 - z)**2)
+
+        epsilon = 0.5 * v**2 - G_mks * (M1 / r1 + M2 / r2)
+
+        # Convert times to appropriate units for the plot
+        times_in_myr = times.to(unit.Myr).value
+
+        # Plot specific orbital energy
+        plt.plot(times_in_myr, epsilon, label=f"Star {i}")
+
+    # Show the plot
+    plt.xlabel('Time (Myr)')
+    plt.ylabel('Specific Orbital Energy (m^2/s^2)')
+    plt.legend()
+    plt.show()
+
 
 
 # VISUALIZATION
@@ -357,6 +404,25 @@ def show_orbits(stars, data):
     ax.set_xlabel(r'$x$ [kpc]', fontsize=12)
     ax.set_ylabel(r'$y$ [kpc]', fontsize=12)
 
+# def show_orbits_3d(stars, data):
+#     '''
+#     plots orbits of stars in xy-plane
+
+#     args: array of star indices,
+#           snapshots returned by evolve_disk
+#     '''
+#     fig, ax = plt.subplots(figsize=(10,10,10), dpi=100, projection='3d')
+    
+#     ax.set_aspect('equal')
+
+#     for n in stars:
+#         orbit = data[:,:,n].transpose()
+#         ax.plot(orbit[0], orbit[1], orbit[2], lw=1)
+
+#     ax.set_xlabel(r'$x$ [kpc]', fontsize=12)
+#     ax.set_ylabel(r'$y$ [kpc]', fontsize=12)
+#     ax.set_zlabel(r'$z$ [kpc]', fontsize=12)
+
 def show_orbits_3d(stars, data):
     '''
     plots orbits of stars in xy-plane
@@ -364,7 +430,8 @@ def show_orbits_3d(stars, data):
     args: array of star indices,
           snapshots returned by evolve_disk
     '''
-    fig, ax = plt.subplots(figsize=(10,10,10), dpi=100, projection='3d')
+    fig = plt.figure(figsize=(10,10))  # change here, only two dimensions are required
+    ax = fig.add_subplot(111, projection='3d')  # use add_subplot to add the 3d projection
     
     ax.set_aspect('equal')
 
@@ -375,6 +442,7 @@ def show_orbits_3d(stars, data):
     ax.set_xlabel(r'$x$ [kpc]', fontsize=12)
     ax.set_ylabel(r'$y$ [kpc]', fontsize=12)
     ax.set_zlabel(r'$z$ [kpc]', fontsize=12)
+
     
 def anim_orbits(stars, data, xlim, ylim, time=None, name='orbits'):
     '''
