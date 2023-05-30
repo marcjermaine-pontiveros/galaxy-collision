@@ -233,6 +233,7 @@ def evolve_two_disks(primary, secondary, time_step=0.1*unit.Myr, N_steps=1000, N
 
     returns: array of snapshot times,
              array of snapshots (spatial coordinates of centers and stars)
+             array of velocity snapshots
     '''
     dt = time_step.to(unit.s).value
 
@@ -275,10 +276,9 @@ def evolve_two_disks(primary, secondary, time_step=0.1*unit.Myr, N_steps=1000, N
     snapshots = np.zeros(shape=(N_snapshots+1,3,N1+N2+2))
     snapshots[0] = [np.append([X1,X2], x), np.append([Y1,Y2], y), np.append([Z1,Z2], z)]
     #print(snapshots.shape)
-
+    # array to store snapshots of all velocities (centers and stars)
     velocity_snapshots = np.zeros(shape=(N_snapshots+1,3,N1+N2+2))
     velocity_snapshots[0] = [np.append([V1_x,V2_x], v_x), np.append([V1_y,V2_y], v_y), np.append([V1_z,V2_z], v_z)]
-
 
     # number of steps per snapshot
     div = max(int(N_steps/N_snapshots), 1)
@@ -399,10 +399,11 @@ def show_orbits(stars, data):
 
     for n in stars:
         orbit = data[:,:,n].transpose()
-        ax.plot(orbit[0], orbit[1], lw=1)
+        ax.plot(orbit[0], orbit[1], lw=1, label=f"Star {n}")
 
     ax.set_xlabel(r'$x$ [kpc]', fontsize=12)
     ax.set_ylabel(r'$y$ [kpc]', fontsize=12)
+    ax.set_legend(loc="lower right")
 
 # def show_orbits_3d(stars, data):
 #     '''
